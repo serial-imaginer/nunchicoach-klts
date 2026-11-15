@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>K-Lucky Talisman Store</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+  <!-- React & ReactDOM (UMD) -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel Standalone (브라우저에서 JSX 즉시 실행용) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- html-to-image (부적 이미지 PNG 저장용) -->
+  <script src="https://unpkg.com/html-to-image@1.11.11/dist/html-to-image.js"></script>
+
+  <style>
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background-color: #f3f4f6;
+    }
+    @keyframes sparkle {
+      0%, 100% { opacity: 1; transform: scale(1); filter: brightness(1.2); }
+      50% { opacity: 0.8; transform: scale(1.05); filter: brightness(1.5); }
+    }
+    @keyframes bob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .sparkle-btn {
+      animation: sparkle 1.5s infinite ease-in-out;
+    }
+    .bob-icon {
+      animation: bob 2s infinite ease-in-out;
+    }
+    .animate-fadeIn {
+      animation: fadeIn 0.25s ease-out;
+    }
+    .talisman-print-enter {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 1s ease-out;
+    }
+    .talisman-print-enter.active {
+      max-height: 1000px;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef } = React;
+    const { toPng } = htmlToImage;
+
+    // types.ts
+    const LuckType = {
+      RICHES: 'Riches',
+      BLESSING: 'Blessing',
+      SUCCESS: 'Success',
+      PEACE: 'Peace',
+      LOVE: 'Love',
+      LONGEVITY: 'Longevity'
+    };
+
+    const COLORS = [
+      { name: 'Red', hex: '#AB110B' },
+      { name: 'Purple', hex: '#CE0E99' },
+      { name: 'Blue', hex: '#0030D4' },
+      { name: 'Green', hex: '#015606' }
+    ];
+
+    // constants.tsx
+    const LUCK_IMAGES = {
+      [LuckType.RICHES]: './images/klts_riches.png',
+      [LuckType.BLESSING]: './images/klts_blessing.png',
+      [LuckType.SUCCESS]: './images/klts_success.png',
+      [LuckType.PEACE]: './images/klts_peace.png',
+      [LuckType.LOVE]: './images/klts_love.png',
+      [LuckType.LONGEVITY]: './images/klts_longevity.png',
+    };
+
+    const CoinIcon = ({ type, className = "w-12 h-12" }) => {
+      return (
+        <img
+          src={LUCK_IMAGES[type]}
+          alt={type}
+          className={`${className} object-contain drop-shadow-sm`}
+          crossOrigin="anonymous"
+        />
+      );
+    };
+
+    // Lucide Icons (Inline SVG for 100% reliability)
+    const DownloadIcon = ({ size = 14, className = "" }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="7 10 12 15 17 10" />
+        <line x1="12" x2="12" y1="15" y2="3" />
+      </svg>
+    );
+
+    const RotateCcwIcon = ({ size = 14, className = "" }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+        <path d="M3 3v5h5" />
+      </svg>
+    );
+
+    const CoffeeIcon = ({ size = 14, className = "" }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M10 2v2" />
+        <path d="M14 2v2" />
+        <path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1" />
+        <path d="M6 2v2" />
+      </svg>
+    );
+
+    const ExternalLinkIcon = ({ size = 10, className = "" }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M15 3h6v6" />
+        <path d="M10 14 21 3" />
+        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      </svg>
+    );
+
+    const ArrowDownIcon = ({ size = 24, className = "" }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M12 5v14" />
+        <path d="m19 12-7 7-7-7" />
+      </svg>
+    );
+
+    // App.tsx
+    const App = () => {
+      const [name, setName] = useState('');
+      const [wish, setWish] = useState('');
+      const [selectedLuck, setSelectedLuck] = useState(null);
+      const [selectedColor, setSelectedColor] = useState(null);
+      const [isPrinted, setIsPrinted] = useState(false);
+      const [isPrinting, setIsPrinting] = useState(false);
+      const [showMore, setShowMore] = useState(false);
+      const [talismanData, setTalismanData] = useState(null);
+      const [isDownloading, setIsDownloading] = useState(false);
+      const talismanRef = useRef(null);
+
+      const isComplete = name.length > 0 && wish.length > 0 && selectedLuck !== null && selectedColor !== null;
+
+      // Convert remote coin image to Base64 for reliable PNG export
+      const fetchImageAsBase64 = async (url) => {
+        try {
+          const response = await fetch(`${url}?t=${Date.now()}`, {
+            mode: 'cors',
+            headers: { 'Accept': 'image/*' }
+          });
+          if (!response.ok) throw new Error('Network response was not ok');
+          const blob = await response.blob();
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        } catch (e) {
+          console.error("Image capture failed due to CORS/Network error", e);
+          return "";
+        }
+      };
+
+      const handlePrint = async () => {
+        if (!isComplete || isPrinting) return;
+
+        setIsPrinting(true);
+
+        // Minimum 1s printing animation delay
+        const delayPromise = new Promise(resolve => setTimeout(resolve, 1000));
+
+        try {
+          const [coinBase64] = await Promise.all([
+            fetchImageAsBase64(LUCK_IMAGES[selectedLuck]),
+            delayPromise
+          ]);
+
+          if (!coinBase64) {
+            alert("Could not load the gold coin image due to security policies. Please try again or check your connection.");
+            setIsPrinting(false);
+            return;
+          }
+
+          const today = new Date();
+          const formattedDate = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, '0')}.${String(today.getDate()).padStart(2, '0')}`;
+
+          setTalismanData({
+            name,
+            wish,
+            luck: selectedLuck,
+            color: selectedColor,
+            date: formattedDate,
+            coinBase64
+          });
+          setIsPrinted(true);
+        } catch (err) {
+          console.error(err);
+          alert("An error occurred while preparing the talisman.");
+        } finally {
+          setIsPrinting(false);
+        }
+      };
+
+      const handleReset = () => {
+        setName('');
+        setWish('');
+        setSelectedLuck(null);
+        setSelectedColor(null);
+        setIsPrinted(false);
+        setTalismanData(null);
+      };
+
+      const handleDownload = async () => {
+        if (!talismanRef.current || isDownloading) return;
+
+        setIsDownloading(true);
+        try {
+          const node = talismanRef.current;
+
+          // 1. Wait 0.15s for rendering stabilization
+          await new Promise(resolve => setTimeout(resolve, 150));
+
+          const options = {
+            cacheBust: true,
+            backgroundColor: talismanData?.color.hex,
+            pixelRatio: 3,
+            width: node.offsetWidth,
+            height: node.offsetHeight,
+          };
+
+          // 2. WebKit / Safari warm-up pass before actual capture
+          await toPng(node, options);
+          const dataUrl = await toPng(node, options);
+
+          const link = document.createElement('a');
+          link.download = `K-Lucky-Talisman-${name || 'gift'}.png`;
+          link.href = dataUrl;
+          link.click();
+        } catch (err) {
+          console.error('Failed to capture talisman image', err);
+          alert('Failed to download the image. Please try again.');
+        } finally {
+          setIsDownloading(false);
+        }
+      };
+
+      return (
+        <div className="min-h-screen bg-black flex justify-center overflow-y-auto selection:bg-yellow-400 selection:text-black">
+          <div
+            className="w-full max-w-[400px] bg-[#FE303F] rounded-[40px] shadow-2xl p-6 flex flex-col relative border-8 border-[#D0202F] overflow-hidden transition-all duration-1000 my-[2cm] mx-2 [container-type:inline-size]"
+            style={{ minHeight: '800px' }}
+          >
+            {/* Header Section */}
+            <div className="text-center mb-6">
+              <h1 className="text-[8.2cqw] font-black text-yellow-300 drop-shadow-md mb-1 italic whitespace-nowrap leading-none tracking-tighter">
+                K - Lucky Talisman Store
+              </h1>
+              <p className="text-white text-[3.3cqw] font-bold opacity-90">
+                Get your customized lucky gold coin talisman
+              </p>
+            </div>
+
+            {/* Input Form Section */}
+            <div className="space-y-4 mb-6">
+              <div className="space-y-1">
+                <label className="text-white text-sm font-bold block">*Name</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    maxLength={20}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    disabled={isPrinted || isPrinting}
+                    placeholder="Enter name for you or a loved one."
+                    className={`w-full bg-white rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 ${isPrinted || isPrinting ? 'opacity-70 cursor-not-allowed bg-gray-100' : ''}`}
+                  />
+                  <span className="absolute bottom-1 right-2 text-[10px] text-gray-400">
+                    {name.length}/20
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-white text-sm font-bold block">*Wish</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    maxLength={30}
+                    value={wish}
+                    onChange={(e) => setWish(e.target.value)}
+                    disabled={isPrinted || isPrinting}
+                    placeholder="Enter your wish or a message for good fortune."
+                    className={`w-full bg-white rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 ${isPrinted || isPrinting ? 'opacity-70 cursor-not-allowed bg-gray-100' : ''}`}
+                  />
+                  <span className="absolute bottom-1 right-2 text-[10px] text-gray-400">
+                    {wish.length}/30
+                  </span>
+                </div>
+              </div>
+
+              {/* Luck Choice Grid */}
+              <div className="space-y-2">
+                <label className="text-white text-sm font-bold block">*Luck Choice</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {Object.values(LuckType).map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => setSelectedLuck(type)}
+                      disabled={isPrinted || isPrinting}
+                      className={`flex flex-col items-center justify-center p-2 rounded-md transition-colors border-2 h-full ${
+                        selectedLuck === type
+                          ? 'bg-yellow-400 border-yellow-600'
+                          : 'bg-[#98FB98] border-green-600'
+                      } ${isPrinted || isPrinting ? 'cursor-not-allowed opacity-80' : 'hover:scale-105 active:scale-95'}`}
+                    >
+                      <CoinIcon type={type} className="w-8 h-8 mb-1" />
+                      <span className="text-[10px] font-bold text-gray-800 text-center leading-tight">{type}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Color Choice */}
+              <div className="space-y-2">
+                <label className="text-white text-sm font-bold block">*Color Choice</label>
+                <div className="flex space-x-2">
+                  {COLORS.map((color) => (
+                    <button
+                      key={color.name}
+                      onClick={() => setSelectedColor(color)}
+                      disabled={isPrinted || isPrinting}
+                      className={`flex-1 h-10 rounded-md border-2 flex items-center justify-center transition-all ${
+                        selectedColor?.name === color.name ? 'scale-110 border-yellow-400 ring-2 ring-white' : 'border-transparent'
+                      } ${isPrinted || isPrinting ? 'cursor-not-allowed opacity-80' : 'hover:scale-105 active:scale-95'}`}
+                      style={{ backgroundColor: color.hex }}
+                    >
+                      <span className="text-[10px] font-bold text-white uppercase shadow-sm">{color.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Print Button */}
+            <button
+              onClick={handlePrint}
+              disabled={!isComplete || isPrinted || isPrinting}
+              className={`w-full py-4 rounded-xl text-lg font-black transition-all mb-8 shadow-inner border-b-4 flex items-center justify-center space-x-2 ${
+                isComplete && !isPrinted && !isPrinting
+                  ? 'bg-yellow-400 text-red-700 hover:bg-yellow-300 cursor-pointer border-yellow-600'
+                  : 'bg-gray-400 text-gray-600 cursor-not-allowed border-gray-500'
+              }`}
+            >
+              <span className="bg-[#FF8C00] text-white text-[10px] px-1.5 py-0.5 rounded leading-none flex items-center justify-center font-bold">
+                {isPrinting ? 'Wait' : 'Free'}
+              </span>
+              <span className="flex items-center">
+                {isPrinting ? 'PRINTING...' : isPrinted ? (
+                  <>K - Lucky Talisman <ArrowDownIcon className="inline-block bob-icon ml-1" size={24} /></>
+                ) : (
+                  'K - Lucky Talisman (click)'
+                )}
+              </span>
+            </button>
+
+            {/* Talisman Display */}
+            {isPrinted && talismanData && (
+              <div className="talisman-print-enter active mb-8 flex justify-center w-full px-2">
+                <div
+                  ref={talismanRef}
+                  className="w-full aspect-[3/5] rounded-xl p-4 flex flex-col items-center justify-between text-center relative overflow-hidden"
+                  style={{
+                    backgroundColor: talismanData.color.hex,
+                    background: `linear-gradient(180deg, ${talismanData.color.hex} 0%, ${talismanData.color.hex}ee 100%)`,
+                    margin: '0 auto'
+                  }}
+                >
+                  {/* Vertical Side Texts */}
+                  <div className="absolute top-6 left-1 text-[8px] font-black tracking-widest pointer-events-none" style={{ color: '#D3A081', writingMode: 'vertical-rl' }}>
+                    K - Lucky Talisman Store
+                  </div>
+                  <div className="absolute top-6 right-1 text-[8px] font-black tracking-widest pointer-events-none" style={{ color: '#D3A081', writingMode: 'vertical-rl' }}>
+                    K - Lucky Talisman Store
+                  </div>
+
+                  {/* Gold Coin Area */}
+                  <div className="z-10 mt-12 mb-4 flex items-center justify-center">
+                    <div className="w-[140px] h-[140px] flex items-center justify-center relative">
+                      <img
+                        src={talismanData.coinBase64}
+                        alt={talismanData.luck}
+                        className="w-full h-full object-contain drop-shadow-xl"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Name Area */}
+                  <div className="z-10 mt-[8px] w-full px-4 text-center">
+                    <h3 className="text-[#FFF3C4] text-[16px] font-black mb-2 tracking-tight overflow-hidden text-ellipsis whitespace-nowrap">
+                      {talismanData.name}
+                    </h3>
+                  </div>
+
+                  {/* Wish Area */}
+                  <div className="z-10 w-full px-[11px] mb-4 mt-[-4px]">
+                    <div className="bg-black/20 backdrop-blur-md border rounded-lg py-4 px-3 w-full" style={{ borderColor: '#D3A081' }}>
+                      <p className="text-[#FFF3C4] text-base font-bold leading-relaxed">
+                        {talismanData.wish}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Divider (Decoration) */}
+                  <div className="z-10 flex items-center justify-center w-full space-x-4 px-12 mt-[-8px] mb-6">
+                    <div className="h-[1px] flex-1" style={{ backgroundColor: '#D3A081' }} />
+                    <div className="w-2 h-2 rotate-45 border" style={{ borderColor: '#D3A081' }} />
+                    <div className="h-[1px] flex-1" style={{ backgroundColor: '#D3A081' }} />
+                  </div>
+
+                  {/* Footer Information */}
+                  <div className="z-10 w-full space-y-1 mt-auto pb-4 px-2">
+                    <p className="text-[10px] font-bold text-[#FFF3C4] tracking-widest">{talismanData.date}</p>
+                    <div className="space-y-0.5">
+                      <p className="text-[9px] text-[#FFF3C4] leading-tight">This talisman is valid for one year from the date of issue.</p>
+                    </div>
+                    <p className="text-[8px] font-black tracking-wider pt-1" style={{ color: '#D3A081' }}>klts.nunchicoach.com</p>
+                    <p className="text-[9px]" style={{ color: '#D3A081', opacity: 0.8 }}>© 2026 NunchiCoach Factory. All Rights Reserved.</p>
+
+                    {/* Bottom Decorative Icons */}
+                    <div className="relative flex justify-between items-center w-full mt-4 px-4 opacity-80">
+                      <div className="w-3.5 h-3.5 rotate-45 border-2" style={{ borderColor: '#D3A081' }} />
+                      <div className="w-2.5 h-2.5 rounded-full border-2" style={{ borderColor: '#D3A081' }} />
+                      <div className="w-3.5 h-3.5 rotate-45 border-2" style={{ borderColor: '#D3A081' }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Vending Machine Controls */}
+            <div className="mt-auto space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={handleDownload}
+                  disabled={!isPrinted || isDownloading}
+                  className={`flex items-center justify-center space-x-1 p-3 rounded-lg font-black text-xs transition-all ${
+                    isPrinted ? 'bg-yellow-400 text-red-700 sparkle-btn cursor-pointer' : 'bg-gray-500 text-gray-300 cursor-not-allowed'
+                  } ${isDownloading ? 'opacity-50' : ''}`}
+                >
+                  <DownloadIcon size={14} />
+                  <span>{isDownloading ? 'SAVING...' : 'DOWNLOAD'}</span>
+                </button>
+                <button
+                  onClick={handleReset}
+                  className="flex items-center justify-center space-x-1 p-3 rounded-lg font-black text-xs bg-white text-red-600 hover:bg-gray-100"
+                >
+                  <RotateCcwIcon size={14} />
+                  <span>RESET</span>
+                </button>
+              </div>
+
+              <a
+                href="https://buymeacoffee.com/nunchicoachfactory"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full bg-[#3e2723] text-yellow-400 py-3 rounded-lg font-bold text-xs flex items-center justify-center space-x-2 hover:bg-[#2d1b19] transition-colors no-underline"
+              >
+                <CoffeeIcon size={14} className="bob-icon" />
+                <span>Gift a Coffee, Double Your Good Vibes!</span>
+              </a>
+
+              <div className="grid grid-cols-2 gap-2">
+                <a
+                  href="https://ccs.nunchicoach.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-white/20 hover:bg-white/30 text-white p-3 rounded-lg font-black text-[10px] flex items-center justify-center space-x-1"
+                >
+                  <span>C.C.S</span>
+                  <ExternalLinkIcon size={10} />
+                </a>
+                <a
+                  href="https://www.amazon.com/author/okpaekartproject"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-white/20 hover:bg-white/30 text-white p-3 rounded-lg font-black text-[10px] flex items-center justify-center space-x-1"
+                >
+                  <span>S.S.S</span>
+                  <ExternalLinkIcon size={10} />
+                </a>
+              </div>
+            </div>
+
+            {/* Footer Section */}
+            <div className="mt-8 text-center text-[10px] text-white/70">
+              <p className="mb-2">© 2026 NunchiCoach Factory. All Rights Reserved</p>
+              <button
+                onClick={() => setShowMore(!showMore)}
+                className="flex items-center justify-center mx-auto bg-white/10 px-3 py-1 rounded text-gray-300 hover:text-white transition-colors border border-white/10"
+              >
+                <span>Terms & Business Info (more {showMore ? '▲' : '▼'})</span>
+              </button>
+
+              {showMore && (
+                <div className="mt-4 p-5 bg-black/30 backdrop-blur-sm rounded-xl text-left text-[10px] leading-relaxed text-gray-100 space-y-4 animate-fadeIn border border-white/10 shadow-xl">
+                  <section>
+                    <h4 className="font-black text-yellow-300 mb-1 uppercase tracking-tight">1. Terms of Use & Disclaimer</h4>
+                    <ul className="list-disc pl-3 space-y-1 text-gray-200">
+                      <li>'K - Lucky Talisman Store', created by NunchiCoach Factory, is an AI-powered app designed for entertainment purposes only.</li>
+                      <li>Please be advised that the company bears no legal responsibility for any outcomes or consequences resulting from the user's subjective interpretation or misuse of the service.</li>
+                      <li>To ensure your privacy, all personal information and data entered during the process are not stored and are destroyed immediately after the result is generated.</li>
+                    </ul>
+                  </section>
+                  <section>
+                    <h4 className="font-black text-yellow-300 mb-1 uppercase tracking-tight">2. Business Information</h4>
+                    <div className="space-y-0.5 text-gray-200">
+                      <p><span className="font-bold">Company Name:</span> NunchiCoach Factory</p>
+                      <p><span className="font-bold">About Us:</span> NunchiCoach Factory is a company that develops various contents related to culture and arts.</p>
+                      <p><span className="font-bold">CEO:</span> Paek Chong Ok</p>
+                      <p><span className="font-bold">Business Registration No.:</span> 363-33-01664</p>
+                      <p><span className="font-bold">Address:</span> 12, Dongrimyongsan-ro, Buk-gu, Gwangju, 61097, Republic of Korea.</p>
+                      <p><span className="font-bold">E-mail:</span> nunchicoach-factory@naver.com</p>
+                    </div>
+                  </section>
+                  <p className="text-center pt-2 text-[9px] opacity-60">
+                    Copyright © 2026 NunchiCoach Factory. All Rights Reserved.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const rootElement = document.getElementById('root');
+    const root = ReactDOM.createRoot(rootElement);
+    root.render(<App />);
+  </script>
+</body>
+</html>
